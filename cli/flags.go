@@ -34,7 +34,7 @@ var flags = []cli.Flag{
 	timeoutGetPayloadFlag,
 	timeoutRegValFlag,
 	maxRetriesFlag,
-	prometheusListenAddr,
+	prometheusPort,
 }
 
 var (
@@ -84,7 +84,7 @@ var (
 		Usage:    "disables adding the version to every log entry",
 		Category: LoggingCategory,
 	}
-	prometheusListenAddr = &cli.IntFlag{
+	prometheusPort = &cli.IntFlag{
 		Name:     "prometheus-port",
 		Sources:  cli.EnvVars("PROMETHEUS_PORT"),
 		Usage:    "when set to a valid http port, will export runtime metrics to a prometheus server on that port",

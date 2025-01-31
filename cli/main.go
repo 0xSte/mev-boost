@@ -93,7 +93,7 @@ func start(_ context.Context, cmd *cli.Command) error {
 		RequestTimeoutGetPayload: time.Duration(cmd.Int(timeoutGetPayloadFlag.Name)) * time.Millisecond,
 		RequestTimeoutRegVal:     time.Duration(cmd.Int(timeoutRegValFlag.Name)) * time.Millisecond,
 		RequestMaxRetries:        int(cmd.Int(maxRetriesFlag.Name)),
-		PrometheusListenAddr:     int(cmd.Int(prometheusListenAddr.Name)),
+		PrometheusPort:           int(cmd.Int(prometheusPort.Name)),
 		PrometheusRegistry:       prometheusRegistry,
 	}
 	service, err := server.NewBoostService(opts)
@@ -105,9 +105,9 @@ func start(_ context.Context, cmd *cli.Command) error {
 		log.Error("no relay passed the health-check!")
 	}
 
-	if opts.PrometheusListenAddr > 0 && opts.PrometheusListenAddr <= math.MaxUint16 {
+	if opts.PrometheusPort > 0 && opts.PrometheusPort <= math.MaxUint16 {
 		go func() {
-			log.Infof("Metric Server Listening on %d", opts.PrometheusListenAddr)
+			log.Infof("Metric Server Listening on %d", opts.PrometheusPort)
 			if err := service.StartMetricsServer(); err != nil {
 				log.WithError(err).Error("metrics server exited with error")
 			}

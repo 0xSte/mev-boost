@@ -72,7 +72,7 @@ type BoostServiceOpts struct {
 	RequestTimeoutGetPayload time.Duration
 	RequestTimeoutRegVal     time.Duration
 	RequestMaxRetries        int
-	PrometheusListenAddr     int
+	PrometheusPort           int
 	PrometheusRegistry       *prometheus.Registry
 }
 
@@ -99,8 +99,8 @@ type BoostService struct {
 	slotUID     *slotUID
 	slotUIDLock sync.Mutex
 
-	prometheusListenAddr int
-	prometheusRegistry   *prometheus.Registry
+	prometheusPort     int
+	prometheusRegistry *prometheus.Registry
 }
 
 // NewBoostService created a new BoostService
@@ -138,9 +138,9 @@ func NewBoostService(opts BoostServiceOpts) (*BoostService, error) {
 			Timeout:       opts.RequestTimeoutRegVal,
 			CheckRedirect: httpClientDisallowRedirects,
 		},
-		requestMaxRetries:    opts.RequestMaxRetries,
-		prometheusListenAddr: opts.PrometheusListenAddr,
-		prometheusRegistry:   opts.PrometheusRegistry,
+		requestMaxRetries:  opts.RequestMaxRetries,
+		prometheusPort:     opts.PrometheusPort,
+		prometheusRegistry: opts.PrometheusRegistry,
 	}, nil
 }
 
@@ -215,7 +215,7 @@ func (m *BoostService) StartMetricsServer() error {
 		EnableOpenMetrics: true,
 	}))
 	return http.ListenAndServe(
-		fmt.Sprintf(":%d", m.prometheusListenAddr),
+		fmt.Sprintf(":%d", m.prometheusPort),
 		serveMux,
 	)
 }
