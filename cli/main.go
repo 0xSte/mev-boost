@@ -74,10 +74,10 @@ func start(_ context.Context, cmd *cli.Command) error {
 	)
 	prometheusRegistry := prometheus.NewRegistry()
 	if err := prometheusRegistry.Register(collectors.NewGoCollector()); err != nil {
-		log.WithError(err).Error("Failed to register metrics for GoCollector")
+		log.WithError(err).Error("failed to register metrics for GoCollector")
 	}
 	if err := prometheusRegistry.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{})); err != nil {
-		log.WithError(err).Error("Failed to register ProcessCollector")
+		log.WithError(err).Error("failed to register ProcessCollector")
 	}
 
 	opts := server.BoostServiceOpts{
@@ -107,7 +107,7 @@ func start(_ context.Context, cmd *cli.Command) error {
 
 	if opts.PrometheusPort > 0 && opts.PrometheusPort <= math.MaxUint16 {
 		go func() {
-			log.Infof("Metric Server Listening on %d", opts.PrometheusPort)
+			log.Infof("metrics server listening on %d", opts.PrometheusPort)
 			if err := service.StartMetricsServer(); err != nil {
 				log.WithError(err).Error("metrics server exited with error")
 			}
@@ -167,7 +167,7 @@ func setupRelays(cmd *cli.Command) (relayList, relayMonitorList, types.U256Str, 
 		log.WithError(err).Fatal("Failed sanitizing min bid")
 	}
 	if relayMinBidWei.BigInt().Sign() > 0 {
-		log.Infof("Min bid set to %v eth (%v wei)", cmd.Float(minBidFlag.Name), relayMinBidWei)
+		log.Infof("min bid set to %v eth (%v wei)", cmd.Float(minBidFlag.Name), relayMinBidWei)
 	}
 	return relays, monitors, *relayMinBidWei, cmd.Bool(relayCheckFlag.Name)
 }

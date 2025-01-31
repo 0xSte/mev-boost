@@ -250,6 +250,8 @@ Usage of mev-boost:
         add a 'service=...' tag to all log messages
   -loglevel string
         minimum loglevel: trace, debug, info, warn/warning, error, fatal, panic (default "info")
+  -prometheus-port int
+        when set to a valid http port, will export runtime metrics to a prometheus server on that port
   -mainnet
         use Mainnet (default true)
   -min-bid float
@@ -313,6 +315,10 @@ Example for setting a minimum bid value of 0.06 ETH:
     -relay $YOUR_RELAY_CHOICE_C
 ```
 
+### Enabling metrics
+
+Optionally, the `-prometheus-port=<port>` flag can be provided to expose prometheus metrics on specified port.
+
 ---
 
 # API
@@ -344,10 +350,6 @@ sequenceDiagram
     Note over mev_boost: verify response matches expected
     mev_boost-->>consensus: submitBlindedBlock response
 ```
-
-# Metrics
-
-Optionally the `-prometheus-port=9000` flag can be passed to expose prometheus metrics on specified port
 
 # Maintainers
 
