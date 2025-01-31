@@ -1,6 +1,8 @@
 linters:
   enable-all: true
   disable:
+    - canonicalheader
+    - depguard
     - dupl
     - exhaustruct
     - funlen
@@ -9,18 +11,16 @@ linters:
     - gocritic
     - godot
     - godox
-    - gomnd
     - lll
+    - mnd
+    - musttag
     - nlreturn
     - nonamedreturns
-    - nosnakecase
     - paralleltest
     - testpackage
     - varnamelen
     - wrapcheck
     - wsl
-    - musttag
-    - depguard
 
     #
     # Maybe fix later:
@@ -40,20 +40,19 @@ linters:
     - contextcheck
     - rowserrcheck
     - sqlclosecheck
-    - structcheck
     - wastedassign
 
     #
     # Disabled because deprecated:
     #
-    - deadcode
-    - exhaustivestruct
-    - golint
-    - ifshort
-    - interfacer
-    - maligned
-    - scopelint
-    - varcheck
+    - copyloopvar
+
+    #
+    # Disabled due to versioning:
+    #
+    - intrange
+    - exportloopref
+
 
 linters-settings:
   gofumpt:
@@ -63,6 +62,10 @@ linters-settings:
     disable:
       - fieldalignment
       - shadow
+  gomoddirectives:
+    replace-allow-list:
+      - github.com/attestantio/go-builder-client
+      - github.com/attestantio/go-eth2-client
 
 output:
   print-issued-lines: true

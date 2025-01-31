@@ -19,6 +19,7 @@ import (
 	builderApiV1 "github.com/attestantio/go-builder-client/api/v1"
 	builderSpec "github.com/attestantio/go-builder-client/spec"
 	eth2ApiV1Deneb "github.com/attestantio/go-eth2-client/api/v1/deneb"
+	eth2ApiV1Electra "github.com/attestantio/go-eth2-client/api/v1/electra"
 	"github.com/attestantio/go-eth2-client/spec"
 	"github.com/attestantio/go-eth2-client/spec/altair"
 	"github.com/attestantio/go-eth2-client/spec/bellatrix"
@@ -91,6 +92,41 @@ func (be *testBackend) request(t *testing.T, method, path string, payload any) *
 }
 
 func blindedBlockContentsToPayloadDeneb(signedBlindedBlockContents *eth2ApiV1Deneb.SignedBlindedBeaconBlock) *builderApiDeneb.ExecutionPayloadAndBlobsBundle {
+	header := signedBlindedBlockContents.Message.Body.ExecutionPayloadHeader
+	numBlobs := len(signedBlindedBlockContents.Message.Body.BlobKZGCommitments)
+	commitments := make([]deneb.KZGCommitment, numBlobs)
+	copy(commitments, signedBlindedBlockContents.Message.Body.BlobKZGCommitments)
+	proofs := make([]deneb.KZGProof, numBlobs)
+	blobs := make([]deneb.Blob, numBlobs)
+	return &builderApiDeneb.ExecutionPayloadAndBlobsBundle{
+		ExecutionPayload: &deneb.ExecutionPayload{
+			ParentHash:    header.ParentHash,
+			FeeRecipient:  header.FeeRecipient,
+			StateRoot:     header.StateRoot,
+			ReceiptsRoot:  header.ReceiptsRoot,
+			LogsBloom:     header.LogsBloom,
+			PrevRandao:    header.PrevRandao,
+			BlockNumber:   header.BlockNumber,
+			GasLimit:      header.GasLimit,
+			GasUsed:       header.GasUsed,
+			Timestamp:     header.Timestamp,
+			ExtraData:     header.ExtraData,
+			BaseFeePerGas: header.BaseFeePerGas,
+			BlockHash:     header.BlockHash,
+			Transactions:  make([]bellatrix.Transaction, 0),
+			Withdrawals:   make([]*capella.Withdrawal, 0),
+			BlobGasUsed:   header.BlobGasUsed,
+			ExcessBlobGas: header.ExcessBlobGas,
+		},
+		BlobsBundle: &builderApiDeneb.BlobsBundle{
+			Commitments: commitments,
+			Proofs:      proofs,
+			Blobs:       blobs,
+		},
+	}
+}
+
+func blindedBlockContentsToPayloadElectra(signedBlindedBlockContents *eth2ApiV1Electra.SignedBlindedBeaconBlock) *builderApiDeneb.ExecutionPayloadAndBlobsBundle {
 	header := signedBlindedBlockContents.Message.Body.ExecutionPayloadHeader
 	numBlobs := len(signedBlindedBlockContents.Message.Body.BlobKZGCommitments)
 	commitments := make([]deneb.KZGCommitment, numBlobs)
@@ -206,7 +242,7 @@ func TestStatus(t *testing.T) {
 		rr := backend.request(t, http.MethodGet, path, nil)
 
 		require.Equal(t, http.StatusOK, rr.Code)
-		require.Greater(t, len(rr.Header().Get("X-MEVBoost-Version")), 0) //nolint:testifylint
+		require.NotEmpty(t, rr.Header().Get("X-MEVBoost-Version"))
 		require.Equal(t, 1, backend.relays[0].GetRequestCount(path))
 	})
 
@@ -218,7 +254,7 @@ func TestStatus(t *testing.T) {
 		rr := backend.request(t, http.MethodGet, path, nil)
 
 		require.Equal(t, http.StatusServiceUnavailable, rr.Code)
-		require.Greater(t, len(rr.Header().Get("X-MEVBoost-Version")), 0) //nolint:testifylint
+		require.NotEmpty(t, rr.Header().Get("X-MEVBoost-Version"))
 		require.Equal(t, 0, backend.relays[0].GetRequestCount(path))
 	})
 }
@@ -269,7 +305,7 @@ func TestRegisterValidator(t *testing.T) {
 			w.WriteHeader(http.StatusBadRequest)
 		})
 		rr = backend.request(t, http.MethodPost, path, payload)
-		require.Equal(t, `{"code":502,"message":"no successful relay response"}`+"\n", rr.Body.String())
+		require.JSONEq(t, `{"code":502,"message":"no successful relay response"}`+"\n", rr.Body.String())
 		require.Equal(t, http.StatusBadGateway, rr.Code)
 		require.Equal(t, 3, backend.relays[0].GetRequestCount(path))
 		require.Equal(t, 3, backend.relays[1].GetRequestCount(path))
@@ -283,7 +319,7 @@ func TestRegisterValidator(t *testing.T) {
 		// Now make the relay return slowly, mev-boost should return an error
 		backend.relays[0].ResponseDelay = 180 * time.Millisecond
 		rr = backend.request(t, http.MethodPost, path, payload)
-		require.Equal(t, `{"code":502,"message":"no successful relay response"}`+"\n", rr.Body.String())
+		require.JSONEq(t, `{"code":502,"message":"no successful relay response"}`+"\n", rr.Body.String())
 		require.Equal(t, http.StatusBadGateway, rr.Code)
 		require.Equal(t, 2, backend.relays[0].GetRequestCount(path))
 	})
@@ -398,7 +434,7 @@ func TestGetHeader(t *testing.T) {
 
 		backend := newTestBackend(t, 1, time.Second)
 		rr := backend.request(t, http.MethodGet, invalidSlotPath, nil)
-		require.Equal(t, `{"code":400,"message":"invalid slot"}`+"\n", rr.Body.String())
+		require.JSONEq(t, `{"code":400,"message":"invalid slot"}`+"\n", rr.Body.String())
 		require.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
 		require.Equal(t, 0, backend.relays[0].GetRequestCount(path))
 	})
@@ -408,7 +444,7 @@ func TestGetHeader(t *testing.T) {
 
 		backend := newTestBackend(t, 1, time.Second)
 		rr := backend.request(t, http.MethodGet, invalidPubkeyPath, nil)
-		require.Equal(t, `{"code":400,"message":"invalid pubkey"}`+"\n", rr.Body.String())
+		require.JSONEq(t, `{"code":400,"message":"invalid pubkey"}`+"\n", rr.Body.String())
 		require.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
 		require.Equal(t, 0, backend.relays[0].GetRequestCount(path))
 	})
@@ -418,7 +454,7 @@ func TestGetHeader(t *testing.T) {
 
 		backend := newTestBackend(t, 1, time.Second)
 		rr := backend.request(t, http.MethodGet, invalidSlotPath, nil)
-		require.Equal(t, `{"code":400,"message":"invalid hash"}`+"\n", rr.Body.String())
+		require.JSONEq(t, `{"code":400,"message":"invalid hash"}`+"\n", rr.Body.String())
 		require.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
 		require.Equal(t, 0, backend.relays[0].GetRequestCount(path))
 	})
@@ -667,7 +703,7 @@ func TestGetPayload(t *testing.T) {
 		rr = backend.request(t, http.MethodPost, path, payload)
 		require.Equal(t, 1, backend.relays[0].GetRequestCount(path))
 		require.Equal(t, 1, backend.relays[1].GetRequestCount(path))
-		require.Equal(t, `{"code":502,"message":"no successful relay response"}`+"\n", rr.Body.String())
+		require.JSONEq(t, `{"code":502,"message":"no successful relay response"}`+"\n", rr.Body.String())
 		require.Equal(t, http.StatusBadGateway, rr.Code, rr.Body.String())
 	})
 
@@ -682,7 +718,7 @@ func TestGetPayload(t *testing.T) {
 			} else {
 				w.WriteHeader(http.StatusInternalServerError)
 				_, err := w.Write([]byte(`{"code":500,"message":"internal server error"}`))
-				require.NoError(t, err)
+				require.NoError(t, err, "failed to write error response") //nolint:testifylint // if we fail here the test is compromised
 			}
 			count++
 		})
@@ -704,12 +740,12 @@ func TestGetPayload(t *testing.T) {
 			} else {
 				w.WriteHeader(http.StatusInternalServerError)
 				_, err := w.Write([]byte(`{"code":500,"message":"internal server error"}`))
-				require.NoError(t, err)
+				require.NoError(t, err, "failed to write error response") //nolint:testifylint // if we fail here the test is compromised
 			}
 		})
 		rr := backend.request(t, http.MethodPost, path, payload)
 		require.Equal(t, 5, backend.relays[0].GetRequestCount(path))
-		require.Equal(t, `{"code":502,"message":"no successful relay response"}`+"\n", rr.Body.String())
+		require.JSONEq(t, `{"code":502,"message":"no successful relay response"}`+"\n", rr.Body.String())
 		require.Equal(t, http.StatusBadGateway, rr.Code, rr.Body.String())
 	})
 }
@@ -785,6 +821,34 @@ func TestGetPayloadDeneb(t *testing.T) {
 	err = json.Unmarshal(rr.Body.Bytes(), resp)
 	require.NoError(t, err)
 	require.Equal(t, signedBlindedBlock.Message.Body.ExecutionPayloadHeader.BlockHash, resp.Deneb.ExecutionPayload.BlockHash)
+}
+
+func TestGetPayloadElectra(t *testing.T) {
+	// Load the signed blinded beacon block used for getPayload
+	jsonFile, err := os.Open("../testdata/signed-blinded-beacon-block-electra.json")
+	require.NoError(t, err)
+	defer jsonFile.Close()
+	signedBlindedBlock := new(eth2ApiV1Electra.SignedBlindedBeaconBlock)
+	require.NoError(t, DecodeJSON(jsonFile, &signedBlindedBlock))
+
+	backend := newTestBackend(t, 1, time.Second)
+
+	// Prepare getPayload response
+	backend.relays[0].GetPayloadResponse = &builderApi.VersionedSubmitBlindedBlockResponse{
+		Version: spec.DataVersionElectra,
+		Electra: blindedBlockContentsToPayloadElectra(signedBlindedBlock),
+	}
+
+	// call getPayload, ensure it's only called on relay 0 (origin of the bid)
+	getPayloadPath := "/eth/v1/builder/blinded_blocks"
+	rr := backend.request(t, http.MethodPost, getPayloadPath, signedBlindedBlock)
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	require.Equal(t, 1, backend.relays[0].GetRequestCount(getPayloadPath))
+
+	resp := new(builderApi.VersionedSubmitBlindedBlockResponse)
+	err = json.Unmarshal(rr.Body.Bytes(), resp)
+	require.NoError(t, err)
+	require.Equal(t, signedBlindedBlock.Message.Body.ExecutionPayloadHeader.BlockHash, resp.Electra.ExecutionPayload.BlockHash)
 }
 
 func TestGetPayloadToAllRelays(t *testing.T) {
