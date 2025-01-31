@@ -34,7 +34,8 @@ var flags = []cli.Flag{
 	timeoutGetPayloadFlag,
 	timeoutRegValFlag,
 	maxRetriesFlag,
-	prometheusPort,
+	metricsFlag,
+	metricsAddrFlag,
 }
 
 var (
@@ -84,10 +85,17 @@ var (
 		Usage:    "disables adding the version to every log entry",
 		Category: LoggingCategory,
 	}
-	prometheusPort = &cli.IntFlag{
-		Name:     "prometheus-port",
-		Sources:  cli.EnvVars("PROMETHEUS_PORT"),
-		Usage:    "when set to a valid http port, will export runtime metrics to a prometheus server on that port",
+	metricsFlag = &cli.BoolFlag{
+		Name:     "metrics",
+		Sources:  cli.EnvVars("METRICS_ENABLED"),
+		Usage:    "enables a metrics server",
+		Category: LoggingCategory,
+	}
+	metricsAddrFlag = &cli.StringFlag{
+		Name:     "metrics-addr",
+		Sources:  cli.EnvVars("METRICS_ADDR"),
+		Value:    "localhost:18551",
+		Usage:    "listening address for the metrics server",
 		Category: LoggingCategory,
 	}
 	// Genesis Flags

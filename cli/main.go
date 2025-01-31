@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"math"
 	"os"
 	"strings"
 	"time"
@@ -14,8 +13,6 @@ import (
 	"github.com/flashbots/mev-boost/common"
 	"github.com/flashbots/mev-boost/config"
 	"github.com/flashbots/mev-boost/server"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v3"
 )
@@ -71,14 +68,9 @@ func start(_ context.Context, cmd *cli.Command) error {
 		genesisForkVersion, genesisTime      = setupGenesis(cmd)
 		relays, monitors, minBid, relayCheck = setupRelays(cmd)
 		listenAddr                           = cmd.String(addrFlag.Name)
+		metricsEnabled                       = cmd.Bool(metricsFlag.Name)
+		metricsAddr                          = cmd.String(metricsAddrFlag.Name)
 	)
-	prometheusRegistry := prometheus.NewRegistry()
-	if err := prometheusRegistry.Register(collectors.NewGoCollector()); err != nil {
-		log.WithError(err).Error("failed to register metrics for GoCollector")
-	}
-	if err := prometheusRegistry.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{})); err != nil {
-		log.WithError(err).Error("failed to register ProcessCollector")
-	}
 
 	opts := server.BoostServiceOpts{
 		Log:                      log,
@@ -93,8 +85,7 @@ func start(_ context.Context, cmd *cli.Command) error {
 		RequestTimeoutGetPayload: time.Duration(cmd.Int(timeoutGetPayloadFlag.Name)) * time.Millisecond,
 		RequestTimeoutRegVal:     time.Duration(cmd.Int(timeoutRegValFlag.Name)) * time.Millisecond,
 		RequestMaxRetries:        int(cmd.Int(maxRetriesFlag.Name)),
-		PrometheusPort:           int(cmd.Int(prometheusPort.Name)),
-		PrometheusRegistry:       prometheusRegistry,
+		MetricsAddr:              metricsAddr,
 	}
 	service, err := server.NewBoostService(opts)
 	if err != nil {
@@ -105,16 +96,16 @@ func start(_ context.Context, cmd *cli.Command) error {
 		log.Error("no relay passed the health-check!")
 	}
 
-	if opts.PrometheusPort > 0 && opts.PrometheusPort <= math.MaxUint16 {
+	if metricsEnabled {
 		go func() {
-			log.Infof("metrics server listening on %d", opts.PrometheusPort)
+			log.Infof("metrics server listening on %v", opts.MetricsAddr)
 			if err := service.StartMetricsServer(); err != nil {
 				log.WithError(err).Error("metrics server exited with error")
 			}
 		}()
 	}
 
-	log.Infof("Listening on %v", listenAddr)
+	log.Infof("listening on %v", listenAddr)
 	return service.StartHTTPServer()
 }
 
